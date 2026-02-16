@@ -42,6 +42,7 @@
 ---@field tick fun(self, state: State): TickResult
 ---@field belt_merging_strategies BeltMergingStrategies
 ---@field belts_and_power_inline boolean
+---@field do_power_pole_joiners boolean
 
 ---@alias TickResult string | boolean | nil
 

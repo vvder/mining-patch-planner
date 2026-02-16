@@ -14,6 +14,8 @@ layout.restrictions.pole_zero_gap = false
 layout.restrictions.logistics_available = true
 layout.restrictions.lane_filling_info_available = false
 
+layout.do_power_pole_joiners = true
+
 ---@param self LogisticsLayout
 ---@param state SimpleState
 function layout:prepare_belt_layout(state)
@@ -50,7 +52,8 @@ function layout:prepare_belt_layout(state)
 	end
 	
 	if (
-		state.pole_choice ~= "none"
+		self.do_power_pole_joiners
+		and state.pole_choice ~= "none"
 		and state.pole_choice ~= "zero_gap"
 		and M.size * 2 + 1 >= math.floor(P.wire)
 		and M.size < (P.wire - 1) * 2

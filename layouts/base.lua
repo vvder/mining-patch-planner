@@ -50,6 +50,7 @@ layout.belt_merging_strategies.back_merging = true
 layout.belt_merging_strategies.side_merging_front = true
 layout.belt_merging_strategies.side_merging_back = true
 layout.belts_and_power_inline = false
+layout.do_power_pole_joiners = false
 
 --- Called from script.on_load
 --- ONLY FOR SETMETATABLE USE

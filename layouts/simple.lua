@@ -69,6 +69,8 @@ layout.restrictions.lane_filling_info_available = true
 layout.restrictions.belt_merging_available = true
 layout.restrictions.belt_planner_available = true
 
+layout.do_power_pole_joiners = true
+
 --[[-----------------------------------
 
 	Basic process rundown:
@@ -1147,7 +1149,7 @@ end
 ---@return number, number
 function layout:_calculate_belt_throughput(state, belt, direction)
 	local belt_speed = state.belt.speed
-	local multiplier = common.get_mining_drill_production(state)
+	local multiplier = common.get_mining_drill_production_from_state(state)
 	---@param lane MinerPlacement[]
 	local function lane_capacity(lane) if lane then return #lane * multiplier / belt_speed end return 0 end
 	local lane1, lane2 = belt.lane1, belt.lane2
@@ -1376,7 +1378,8 @@ function layout:prepare_belt_layout(state)
 	state.builder_belts = builder_belts
 
 	if (
-		state.pole_choice ~= "none"
+		self.do_power_pole_joiners
+		and state.pole_choice ~= "none"
 		and state.pole_choice ~= "zero_gap"
 		and M.size * 2 + 1 >= floor(P.wire)
 		and M.size < (P.wire - 1) * 2

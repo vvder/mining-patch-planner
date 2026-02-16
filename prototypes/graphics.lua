@@ -369,4 +369,20 @@ data:extend{
 		mipmap_count = 0,
 		flags = { "icon" },
 	},
+	{
+		type = "sprite",
+		name = "mpp_stack_capacity_enabled",
+		filename = graphics.."stack-capacity-enabled.png",
+		size = 64,
+		mipmap_count = 0,
+		flags = { "icon" },
+	},
+	{
+		type = "sprite",
+		name = "mpp_stack_capacity_disabled",
+		filename = graphics.."stack-capacity-disabled.png",
+		size = 64,
+		mipmap_count = 0,
+		flags = { "icon" },
+	},
 }

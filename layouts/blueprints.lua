@@ -1039,7 +1039,7 @@ function layout:process_forward_outputs(state)
 			x_entry = x,
 			x_end = x,
 			y = y,
-			has_drills = true,
+			has_drills = false,
 			is_output = true,
 			throughput1 = 0,
 			throughput2 = 0,
@@ -1063,7 +1063,7 @@ function layout:process_forward_outputs(state)
 		local belt_struct = mpp_util.belt_struct(belt_choice)
 		state.belt = belt_struct
 		local belt_speed = state.belt.speed
-		local multiplier = common.get_mining_drill_production(state)
+		local multiplier = common.get_mining_drill_production_from_state(state)
 		
 		for iy, row in pairs(state.drill_output_locations) do
 			for ix, outputs in pairs(row) do
@@ -1082,8 +1082,11 @@ function layout:process_forward_outputs(state)
 			belt.throughput2 = belt.throughput2 * multiplier / belt_speed
 			belt.merged_throughput1 = belt.throughput1
 			belt.merged_throughput2 = belt.throughput2
+			
+			if belt.throughput1 > 0 or belt.throughput2 > 0 then
+				belt.has_drills = true
+			end
 		end
-		
 	end
 	
 	return "prepare_belt_layout_backward"

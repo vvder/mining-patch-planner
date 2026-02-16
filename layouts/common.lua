@@ -499,14 +499,18 @@ function common.draw_belt_stats(state, belt, belt_speed, speed1, speed2, stagger
 	end
 	local c1, c2, c3, c4 = {.9, .9, .9}, {0, 0, 0}, {1, .2, 0}, {.4, .4, .4}
 	x1 = x1 + stagger
+	local capacity_mult = 1
+	if state.use_stack_capacity_multiplier_choice then
+		capacity_mult = 1 + state.player.force.belt_stack_size_bonus
+	end
 	
 	local ratio1 = speed1
 	local ratio2 = speed2
 	local function get_color(ratio)
-		return ratio > 1.01 and c3 or ratio == 0 and c4 or c1
+		return ratio > capacity_mult + .01 and c3 or ratio == 0 and c4 or c1
 	end
 	local function cap_prod(speed)
-		return min(1, speed) * belt_speed, speed > 1 and  "+" or ""
+		return min(capacity_mult, speed) * belt_speed, speed > capacity_mult and  "+" or ""
 	end
 	
 	r[#r+1] = rendering.draw_text{
@@ -523,9 +527,9 @@ function common.draw_belt_stats(state, belt, belt_speed, speed1, speed2, stagger
 		target=l2w(x1-2, y1+.6), scale=1.6,
 		text=string.format("%.2f%s/s", cap_prod(ratio2))
 	}
-	local total_ratio = min(1, ratio1) + min(1, ratio2)
+	local total_ratio = min(capacity_mult, ratio1) + min(capacity_mult, ratio2)
 	local total_color = c1
-	if ratio1 > 1 or ratio2 > 1 then
+	if ratio1 > capacity_mult or ratio2 > capacity_mult then
 		total_color = c3
 	end
 	local accomodation = c.is_horizontal and -5.5 or -3.5
@@ -534,7 +538,7 @@ function common.draw_belt_stats(state, belt, belt_speed, speed1, speed2, stagger
 		color=total_color, time_to_live=ttl or 1,
 		alignment="center", vertical_alignment="middle",
 		target=l2w(x1+accomodation, y1), scale=2,
-		text=string.format("%.2f%s/s", min(2, total_ratio) * belt_speed, (ratio1>1 or ratio2>1) and  "+" or "")
+		text=string.format("%.2f%s/s", min(2*capacity_mult, total_ratio) * belt_speed, (ratio1>capacity_mult or ratio2>capacity_mult) and  "+" or "")
 	}
 end
 
@@ -588,7 +592,7 @@ end
 
 ---@param state State
 ---@return number
-function common.get_mining_drill_production(state)
+function common.get_mining_drill_production_from_state(state)
 	local drill_speed = prototypes.entity[state.miner_choice].mining_speed
 	local belt_speed = prototypes.entity[state.belt_choice].belt_speed * 60 * 4
 	local dominant_resource = state.resource_counts[1].name
@@ -1029,6 +1033,11 @@ function common.display_lane_filling(state)
 	if not state.display_lane_filling_choice or not state.belts or not state.belt then return end
 
 	local belt_speed = state.belt.speed
+	local capacity_mult = 1
+	if state.use_stack_capacity_multiplier_choice then
+		capacity_mult = 1 + state.player.force.belt_stack_size_bonus
+	end
+	
 	local belts = state.belts
 	local throughput_capped1, throughput_capped2 = 0, 0
 	local throughput_total1, throughput_total2 = 0, 0
@@ -1039,12 +1048,12 @@ function common.display_lane_filling(state)
 
 	for i, belt in pairs(belts) do
 		---@cast belt BeltSpecification
-		if belt.merge_direction or not belt.lane1 and not belt.lane2 then goto continue end
+		if belt.merge_direction or (not belt.lane1 and not belt.lane2) then goto continue end
 
 		local speed1, speed2 = belt.merged_throughput1, belt.merged_throughput2
 
-		throughput_capped1 = throughput_capped1 + math.min(1, speed1)
-		throughput_capped2 = throughput_capped2 + math.min(1, speed2)
+		throughput_capped1 = throughput_capped1 + math.min(capacity_mult, speed1)
+		throughput_capped2 = throughput_capped2 + math.min(capacity_mult, speed2)
 		throughput_total1 = throughput_total1 + speed1
 		throughput_total2 = throughput_total2 + speed2
 

@@ -28,6 +28,8 @@ layout.restrictions.lamp_available = false
 layout.restrictions.module_available = true
 layout.restrictions.pipe_available = false
 
+layout.do_power_pole_joiners = false
+
 ---@class SuperCompactState : SimpleState
 ---@field miner_bounds any
 
@@ -140,7 +142,7 @@ end
 ---@return number, number
 function layout:_calculate_belt_throughput(state, belt, direction)
 	local belt_speed = state.belt.speed
-	local multiplier = common.get_mining_drill_production(state)
+	local multiplier = common.get_mining_drill_production_from_state(state)
 	local lane1, lane2 = belt.lane1, belt.lane2
 	
 	local dirs =  {[NORTH]=0, [EAST]=0, [SOUTH]=0, [WEST]=0}

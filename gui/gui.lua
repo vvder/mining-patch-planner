@@ -1202,6 +1202,15 @@ local function update_misc_selection(player)
 			icon_enabled=("mpp_force_pipe_enabled"),
 		}
 	end
+	
+	if player_data.advanced and layout.restrictions.lane_filling_info_available then
+		values:push{
+			value="use_stack_capacity_multiplier",
+			tooltip={"mpp.choice_use_stack_capacity_multiplier"},
+			icon=("mpp_stack_capacity_disabled"),
+			icon_enabled=("mpp_stack_capacity_enabled"),
+		}
+	end
 
 	if player_data.advanced and false then
 		values:push{

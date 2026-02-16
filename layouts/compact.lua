@@ -34,6 +34,8 @@ layout.restrictions.belt_merging_available = true
 layout.restrictions.belt_planner_available = true
 layout.belts_and_power_inline = true
 
+layout.do_power_pole_joiners = true
+
 ---@param self CompactLayout
 ---@param state CompactState
 function layout:initialize(state)
@@ -377,7 +379,8 @@ function layout:prepare_belt_layout(state)
 	state.builder_belts = builder_belts
 	
 	if (
-		state.pole_choice ~= "none"
+		self.do_power_pole_joiners
+		and state.pole_choice ~= "none"
 		and state.pole_choice ~= "zero_gap"
 		and M.size * 2 + 1 >= floor(P.wire)
 		and M.size < (P.wire - 1) * 2
