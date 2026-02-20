@@ -30,7 +30,7 @@ data:extend{
 		name = "mpp_no_entity_zero",
 		filename = graphics.."no-entity-zero.png",
 		size = 64,
-		mipmap_count = 3,
+		mipmap_count = 2,
 		flags = { "icon" },
 	},
 	{
@@ -110,7 +110,7 @@ data:extend{
 		name = "mpp_omit_landfill",
 		filename = graphics.."omit_landfill.png",
 		size = 64,
-		mipmap_count = 3,
+		mipmap_count = 1,
 		flags = { "icon" },
 	},
 	{
