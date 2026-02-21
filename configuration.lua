@@ -64,7 +64,6 @@ local conf = {}
 ---@field belt_merge_choice boolean
 ---@field use_stack_capacity_multiplier_choice boolean
 ---@field train_station_choice boolean
----@field train_station_type_choice "loading"|"unloading"
 ---@field train_station_offset_choice number
 ---@field train_station_train_length_choice number
 ---@field train_station_wagon_length_choice number
@@ -145,7 +144,6 @@ conf.default_config = {
 		avoid_cliffs_choice = false,
 		use_stack_capacity_multiplier_choice = false,
 		train_station_choice = false,
-		train_station_type_choice = "loading",
 		train_station_offset_choice = 12,
 		train_station_train_length_choice = 1,
 		train_station_wagon_length_choice = 2,
