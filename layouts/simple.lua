@@ -6,6 +6,7 @@ local mpp_util = require("mpp.mpp_util")
 local builder = require("mpp.builder")
 local cliffs = require("mpp.cliffs")
 local belt_planner = require("mpp.belt_planner")
+local train_station_planner = require("mpp.train_station_planner")
 local coord_convert, coord_revert = mpp_util.coord_convert, mpp_util.coord_revert
 local internal_revert, internal_convert = mpp_util.internal_revert, mpp_util.internal_convert
 local miner_direction, opposite = mpp_util.miner_direction, mpp_util.opposite
@@ -2006,6 +2007,12 @@ function layout:finish(state)
 	if state.belt_planner_choice then
 		belt_planner.clear_belt_planner_stack(storage.players[state.player.index])
 		common.give_belt_blueprint(state)
+	end
+
+	if state.train_station_choice then
+		local player_data = storage.players[state.player.index]
+		train_station_planner.clear_stack(player_data)
+		common.give_train_station_blueprint(state)
 	end
 
 	return false

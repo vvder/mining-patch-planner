@@ -4,6 +4,7 @@ local enums = require("mpp.enums")
 local blueprint_meta = require("mpp.blueprintmeta")
 local compatibility = require("mpp.compatibility")
 local belt_planner = require("mpp.belt_planner")
+local train_station_planner = require("mpp.train_station_planner")
 local common = require("layouts.common")
 
 local layouts = algorithm.layouts
@@ -1033,6 +1034,13 @@ local function update_misc_selection(player)
 			icon=("mpp_belt_planner"),
 			icon_enabled=("mpp_belt_planner")
 		}
+
+		values:push{
+			value="train_station",
+			tooltip={"mpp.choice_train_station_planner"},
+			icon=("item/train-stop"),
+			icon_enabled=("item/train-stop")
+		}
 	end
 	
 	if layout.restrictions.belt_merging_available then
@@ -1544,6 +1552,17 @@ local function on_gui_click(event)
 			common.give_belt_blueprint(last_state)
 			return
 		end
+		if value == "train_station" and event.button == defines.mouse_button_type.right then
+			local last_state = player_data.last_state
+			if not last_state then
+				player.print({"mpp.msg_train_station_err_create_planner_no_previous_state"})
+				return
+			end
+			train_station_planner.clear_stack(player_data)
+			common.give_train_station_blueprint(last_state)
+			return
+		end
+
 		
 		if evt_ele_tags.mpp_icon_enabled then
 			if not last_value then

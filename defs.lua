@@ -136,6 +136,24 @@
 ---@field ungrouped boolean Is first step when belts are spaced out?
 ---@field _renderables LuaRenderObject[]
 
+---@class TrainStationPlannerSpecification
+---@field [number] BeltSpecification
+---@field player LuaPlayer
+---@field surface LuaSurface
+---@field coords Coords
+---@field direction_choice DirectionString
+---@field belt_choice string
+---@field count number
+
+---@class TrainStationPlannerState : TaskState
+---@field type "train_station_planner"
+---@field spec TrainStationPlannerSpecification
+---@field anchor_x number
+---@field anchor_y number
+---@field anchor_direction defines.direction
+---@field options table<string, any>
+
+
 ---@alias LuaRenderingFunction fun(RendererParams): uint64
 
 ---@class MppRendering

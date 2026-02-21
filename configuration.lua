@@ -24,6 +24,7 @@ local conf = {}
 ---@field selection_render LuaRenderObject[] Selection overlay
 ---@field belt_planner_blueprint LuaItemStack?
 ---@field belt_planner_stack BeltPlannerSpecification[]
+---@field train_station_planner_stack TrainStationPlannerSpecification[]
 
 ---@class PlayerChoices
 ---@field layout_choice string
@@ -62,6 +63,7 @@ local conf = {}
 ---@field belt_planner_choice boolean
 ---@field belt_merge_choice boolean
 ---@field use_stack_capacity_multiplier_choice boolean
+---@field train_station_choice boolean
 
 ---@class PlayerGui
 ---@field section table<MppSettingSections, LuaGuiElement>
@@ -103,6 +105,7 @@ conf.default_config = {
 	selection_render = {},
 	selection_cache = {},
 	belt_planner_stack = {},
+	train_station_planner_stack = {},
 
 	choices = {
 		layout_choice = "simple",
@@ -137,6 +140,7 @@ conf.default_config = {
 		avoid_water_choice = false,
 		avoid_cliffs_choice = false,
 		use_stack_capacity_multiplier_choice = false,
+		train_station_choice = false,
 
 		-- non layout/convienence/advanced settings
 		show_non_electric_miners_choice = false,

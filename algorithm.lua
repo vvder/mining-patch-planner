@@ -29,6 +29,7 @@ require_layout("blueprints")
 ---@alias TaskType
 ---| "layout"
 ---| "belt_planner"
+---| "train_station_planner"
 
 ---@class TaskState
 ---@field type TaskType
@@ -93,6 +94,7 @@ require_layout("blueprints")
 ---@field belt_merge_choice boolean
 ---@field balancer_choice boolean
 ---@field use_stack_capacity_multiplier_choice boolean
+---@field train_station_choice boolean
 ---
 ---@field grid Grid
 ---@field convolution_cache GridTile[]
