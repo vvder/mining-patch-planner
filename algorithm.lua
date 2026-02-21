@@ -95,7 +95,6 @@ require_layout("blueprints")
 ---@field balancer_choice boolean
 ---@field use_stack_capacity_multiplier_choice boolean
 ---@field train_station_choice boolean
----@field train_station_type_choice "loading"|"unloading"
 ---@field train_station_offset_choice number
 ---@field train_station_train_length_choice number
 ---@field train_station_wagon_length_choice number

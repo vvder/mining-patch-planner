@@ -1248,20 +1248,6 @@ local function update_misc_selection(player)
 		local config_root = misc_section.add{type="flow", direction="vertical", name="mpp_train_station_config"}
 		config_root.style.top_margin = 6
 
-		config_root.add{type="label", caption={"mpp.train_station_type_label"}}
-		local station_type_items = {
-			{"mpp.train_station_type_loading"},
-			{"mpp.train_station_type_unloading"},
-		}
-		local station_type_choice = choices.train_station_type_choice or "loading"
-		local station_type_index = station_type_choice == "unloading" and 2 or 1
-		config_root.add{
-			type="drop-down",
-			items=station_type_items,
-			selected_index=station_type_index,
-			tags={mpp_drop_down="train_station_type", mpp_value_map="train_station_type", default=1},
-		}
-
 		local numeric_table = config_root.add{type="table", column_count=2}
 		numeric_table.add{type="label", caption={"mpp.train_station_offset_label"}}
 		numeric_table.add{
@@ -1734,8 +1720,6 @@ local function on_gui_selection_state_changed(event)
 		value = layouts[element.selected_index].name
 	elseif value_map == "quality" then
 		value = mpp_util.quality_list()[element.selected_index].value
-	elseif value_map == "train_station_type" then
-		value = element.selected_index == 2 and "unloading" or "loading"
 	else
 		return
 	end

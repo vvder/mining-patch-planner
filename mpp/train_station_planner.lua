@@ -85,7 +85,6 @@ function train_station_planner.generate_from_layout_state(state)
 	local station_offset = clamp_positive_int(state.train_station_offset_choice, 12)
 	local train_length = clamp_positive_int(state.train_station_train_length_choice, 1)
 	local wagon_length = clamp_positive_int(state.train_station_wagon_length_choice, 2)
-	local station_type = state.train_station_type_choice or "loading"
 	local anchor_x, anchor_y, station_direction
 	local rail_vertical = true
 	local side = 1
@@ -160,8 +159,8 @@ function train_station_planner.generate_from_layout_state(state)
 			inserter_direction = side > 0 and SOUTH or NORTH
 		end
 		local reverse_inserter_direction = (inserter_direction + 4) % 8
-		local near_rail_direction = station_type == "unloading" and reverse_inserter_direction or inserter_direction
-		local near_belt_direction = station_type == "unloading" and inserter_direction or reverse_inserter_direction
+		local near_rail_direction = inserter_direction
+		local near_belt_direction = reverse_inserter_direction
 		
 		-- 靠铁轨的插入器
 		place_ghost(surface, player, force, {
