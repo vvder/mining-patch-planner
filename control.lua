@@ -294,7 +294,7 @@ script.on_event(defines.events.on_built_entity, function(event)
 	local surface = ent.surface
 	
 	ent.destroy()
-	
+
 	if tags.mpp_belt_planner ~= "main" then return end
 	
 	local belt_planner_stack = storage.players[event.player_index].belt_planner_stack

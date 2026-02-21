@@ -1033,6 +1033,13 @@ local function update_misc_selection(player)
 			icon=("mpp_belt_planner"),
 			icon_enabled=("mpp_belt_planner")
 		}
+
+		values:push{
+			value="train_station",
+			tooltip={"mpp.choice_train_station_planner"},
+			icon=("item/train-stop"),
+			icon_enabled=("item/train-stop")
+		}
 	end
 	
 	if layout.restrictions.belt_merging_available then

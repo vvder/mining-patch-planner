@@ -1413,6 +1413,10 @@ function layout:finish(state)
 		belt_planner.clear_belt_planner_stack(storage.players[state.player.index])
 		common.give_belt_blueprint(state)
 	end
+
+	if state.train_station_choice then
+		common.generate_train_station_ghosts(state)
+	end
 	
 	return false
 end

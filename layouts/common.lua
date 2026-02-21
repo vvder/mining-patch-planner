@@ -1,6 +1,7 @@
 local mpp_util = require("mpp.mpp_util")
 local render_util = require("mpp.render_util")
 local belt_planner = require("mpp.belt_planner")
+local train_station_planner = require("mpp.train_station_planner")
 
 local common = {}
 
@@ -1161,6 +1162,11 @@ function common.give_belt_blueprint(state)
 	belt_planner.push_belt_planner_step(state.player.index, belt_planner_spec)
 
 	return belt_planner.give_blueprint(state, belt_planner_spec)
+end
+
+---@param state MinimumPreservedState
+function common.generate_train_station_ghosts(state)
+	return train_station_planner.generate_from_layout_state(state)
 end
 
 function common.create_pipe_building_environment(state)
