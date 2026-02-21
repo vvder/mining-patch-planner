@@ -171,16 +171,16 @@ function train_station_planner.generate_from_layout_state(state)
 		end
 	end
 
-	print_step(state, "5/5", "add power poles")
-	for i = -6, 6, 3 do
-		local pole_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + i)
-		local pole_y = rail_vertical and (anchor_y + i) or (anchor_y + side * 5)
-		place_ghost(surface, player, force, {
-			name = pole_name,
-			position = {pole_x, pole_y},
-			direction = NORTH,
-		})
-	end
+	-- print_step(state, "5/5", "add power poles")
+	-- for i = -6, 6, 3 do
+	-- 	local pole_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + i)
+	-- 	local pole_y = rail_vertical and (anchor_y + i) or (anchor_y + side * 5)
+	-- 	place_ghost(surface, player, force, {
+	-- 		name = pole_name,
+	-- 		position = {pole_x, pole_y},
+	-- 		direction = NORTH,
+	-- 	})
+	-- end
 
 	print_step(state, "done", "belt-to-train-station ghosts generated")
 end
