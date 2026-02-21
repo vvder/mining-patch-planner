@@ -77,25 +77,25 @@ function train_station_planner.generate_from_layout_state(state)
 	local side = 1
 
 	if direction == "east" then
-		anchor_x = max_x + 18
+		anchor_x = max_x + 12
 		anchor_y = avg_y
 		station_direction = SOUTH
 		rail_vertical = true
 		side = -1
 	elseif direction == "north" then
 		anchor_x = avg_x
-		anchor_y = min_y - 18
+		anchor_y = min_y - 12
 		station_direction = EAST
 		rail_vertical = false
 		side = 1
 	elseif direction == "south" then
 		anchor_x = avg_x
-		anchor_y = max_y + 18
+		anchor_y = max_y + 12
 		station_direction = WEST
 		rail_vertical = false
 		side = -1
 	else
-		anchor_x = min_x - 18
+		anchor_x = min_x - 12
 		anchor_y = avg_y
 		station_direction = NORTH
 		rail_vertical = true
@@ -103,7 +103,7 @@ function train_station_planner.generate_from_layout_state(state)
 	end
 
 	print_step(state, "1/5", "create rail line")
-	for i = -8, 8 do
+	for i = -16, 16 do
 		local rail_x = rail_vertical and anchor_x or (anchor_x + i)
 		local rail_y = rail_vertical and (anchor_y + i) or anchor_y
 		place_ghost(surface, player, force, {
@@ -114,34 +114,56 @@ function train_station_planner.generate_from_layout_state(state)
 	end
 
 	print_step(state, "2/5", "create train stop")
+	local trainstop_x = rail_vertical and (anchor_x+side*2) or (anchor_x+side*8)
+	local trainstop_y = rail_vertical and (anchor_y+side*8)  or (anchor_y+side*2)
 	place_ghost(surface, player, force, {
 		name = "train-stop",
-		position = {anchor_x, anchor_y},
+		position = {trainstop_x, trainstop_y},
 		direction = station_direction,
 		tags = {station_name = "MPP Mining Loading"},
 	})
 
+-- 改进后的代码 (L124-155)
 	print_step(state, "3/5", "create loading chests and inserters")
 	for i, _ in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
+		
+		-- 第一个插入器：从传送带取货到箱子
+		local inserter1_x = rail_vertical and (anchor_x + side * 3) or (anchor_x + lane)
+		local inserter1_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 3)
+		
+		-- 箱子
 		local chest_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + lane)
 		local chest_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 2)
-		local inserter_x = rail_vertical and (anchor_x + side) or (anchor_x + lane)
-		local inserter_y = rail_vertical and (anchor_y + lane) or (anchor_y + side)
+		
+		-- 第二个插入器：从箱子取货到火车
+		local inserter2_x = rail_vertical and (anchor_x + side) or (anchor_x + lane)
+		local inserter2_y = rail_vertical and (anchor_y + lane) or (anchor_y + side)
 		local inserter_direction = NORTH
 		if rail_vertical then
 			inserter_direction = side > 0 and EAST or WEST
 		else
 			inserter_direction = side > 0 and SOUTH or NORTH
 		end
+		
+		-- 放置第一个插入器（传送带→箱子）
+		place_ghost(surface, player, force, {
+			name = inserter_name,
+			position = {inserter1_x, inserter1_y},
+			direction = inserter_direction,
+		})
+		
+		-- 放置箱子
 		place_ghost(surface, player, force, {
 			name = chest_name,
 			position = {chest_x, chest_y},
 			direction = NORTH,
 		})
+		
+		-- 放置第二个插入器（箱子→铁轨）
 		place_ghost(surface, player, force, {
 			name = inserter_name,
-			position = {inserter_x, inserter_y},
+			position = {inserter2_x, inserter2_y},
 			direction = inserter_direction,
 		})
 	end
