@@ -1415,9 +1415,7 @@ function layout:finish(state)
 	end
 
 	if state.train_station_choice then
-		local player_data = storage.players[state.player.index]
-		train_station_planner.clear_stack(player_data)
-		common.give_train_station_blueprint(state)
+		common.generate_train_station_ghosts(state)
 	end
 	
 	return false

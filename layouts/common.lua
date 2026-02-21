@@ -1165,41 +1165,8 @@ function common.give_belt_blueprint(state)
 end
 
 ---@param state MinimumPreservedState
-function common.give_train_station_blueprint(state)
-	local belts = state.belts
-	if belts == nil or #belts == 0 then return end
-
-	---@type TrainStationPlannerSpecification
-	local spec = {
-		surface = state.surface,
-		player = state.player,
-		coords = state.coords,
-		direction_choice = state.direction_choice,
-		belt_choice = state.belt_choice,
-		count = 0,
-	}
-
-	table.sort(belts, function(a, b) return a.y < b.y end)
-	local count = 0
-	for _, belt in pairs(belts) do
-		if belt.is_output == true then
-			count = count + 1
-			spec[count] = table.deepcopy(belt)
-		end
-	end
-
-	local converter = mpp_util.reverter_delegate(state.coords, state.direction_choice)
-	for _, belt in ipairs(spec) do
-		local gx, gy = converter(belt.x_start-1, belt.y)
-		belt.world_x = gx
-		belt.world_y = gy
-	end
-
-	spec.count = count
-	if count == 0 then return end
-
-	train_station_planner.push_step(state.player.index, spec)
-	return train_station_planner.give_blueprint(state, spec)
+function common.generate_train_station_ghosts(state)
+	return train_station_planner.generate_from_layout_state(state)
 end
 
 function common.create_pipe_building_environment(state)

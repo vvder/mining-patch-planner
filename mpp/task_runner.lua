@@ -89,9 +89,5 @@ function task_runner.belt_plan_task(state)
 	belt_planner.layout(state)
 end
 
----@param state TrainStationPlannerState
-function task_runner.train_station_plan_task(state)
-	train_station_planner.layout(state)
-end
 
 return task_runner

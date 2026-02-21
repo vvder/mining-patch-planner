@@ -9,41 +9,6 @@ local function print_step(state, step, message)
 	end
 end
 
----@param player_data PlayerData
-function train_station_planner.clear_stack(player_data)
-	player_data.train_station_planner_stack = {}
-end
-
----@param player LuaPlayer|integer
----@param spec TrainStationPlannerSpecification
-function train_station_planner.push_step(player, spec)
-	player = type(player) == "number" and player or player.index
-	---@type PlayerData
-	local player_data = storage.players[player]
-	player_data.train_station_planner_stack = player_data.train_station_planner_stack or {}
-	table.insert(player_data.train_station_planner_stack, spec)
-end
-
----@param state MinimumPreservedState
----@param spec TrainStationPlannerSpecification
-function train_station_planner.give_blueprint(state, _spec)
-	local ply = state.player
-	local stack = ply.cursor_stack --[[@as LuaItemStack]]
-	stack.set_stack("mpp-blueprint-belt-planner")
-
-	stack.set_blueprint_entities({
-		{
-			name = state.belt_choice,
-			position = {1, 1},
-			direction = defines.direction.north,
-			entity_number = 1,
-			tags = {mpp_train_station_planner = "main"},
-		},
-	})
-	ply.cursor_stack_temporary = true
-	return stack
-end
-
 ---@param surface LuaSurface
 ---@param player LuaPlayer
 ---@param force LuaForce
@@ -58,78 +23,116 @@ local function place_ghost(surface, player, force, ghost)
 	surface.create_entity(ghost)
 end
 
----@param state TrainStationPlannerState
-function train_station_planner.layout(state)
-	local surface = state.surface
-	local player = state.player
-	local force = player.force
-	local spec = state.spec
-	if spec == nil or spec.count == nil or spec.count < 1 then
-		print_step(state, "skip", "no belt outputs available")
+---@param belts BeltSpecification[]
+local function to_world_belt_outputs(state, belts)
+	local outputs = {}
+	local converter = mpp_util.reverter_delegate(state.coords, state.direction_choice)
+	for _, belt in pairs(belts or {}) do
+		if belt.is_output == true then
+			local gx, gy = converter(belt.x_start - 1, belt.y)
+			outputs[#outputs+1] = {x = math.floor(gx), y = math.floor(gy)}
+		end
+	end
+	table.sort(outputs, function(a, b) return a.y < b.y end)
+	return outputs
+end
+
+---@param state MinimumPreservedState
+function train_station_planner.generate_from_layout_state(state)
+	local outputs = to_world_belt_outputs(state, state.belts)
+	if #outputs == 0 then
+		print_step(state, "skip", "no output belts")
 		return
 	end
 
-	local anchor_x, anchor_y = math.floor(state.anchor_x), math.floor(state.anchor_y)
-	local station_direction = state.anchor_direction
-	local belt_name = spec.belt_choice
-	local chest_name = state.options and state.options.chest_name or "steel-chest"
-	local inserter_name = state.options and state.options.inserter_name or "fast-inserter"
+	local surface = state.surface
+	local player = state.player
+	local force = player.force
+	local belt_name = state.belt_choice
+	local chest_name = "steel-chest"
+	local inserter_name = "fast-inserter"
 	local rail_name = "straight-rail"
-	local station_name = state.options and state.options.station_name or "MPP Mining Loading"
+	local pole_name = state.pole_choice ~= "none" and state.pole_choice or "medium-electric-pole"
+
+	local avg_y = 0
+	local min_x = outputs[1].x
+	for _, o in ipairs(outputs) do
+		avg_y = avg_y + o.y
+		if o.x < min_x then min_x = o.x end
+	end
+	avg_y = math.floor(avg_y / #outputs)
+
+	local anchor_x = min_x - 18
+	local anchor_y = avg_y
+	local station_direction = NORTH
+	local side = 1
 
 	print_step(state, "1/5", "create rail line")
-	if station_direction == NORTH or station_direction == SOUTH then
-		for i = -8, 8 do
-			place_ghost(surface, player, force, {name = rail_name, grid_x = 0, grid_y = 0, position = {anchor_x, anchor_y + i}, direction = station_direction})
-		end
-	else
-		for i = -8, 8 do
-			place_ghost(surface, player, force, {name = rail_name, grid_x = 0, grid_y = 0, position = {anchor_x + i, anchor_y}, direction = station_direction})
-		end
+	for i = -8, 8 do
+		place_ghost(surface, player, force, {
+			name = rail_name,
+			position = {anchor_x, anchor_y + i},
+			direction = station_direction,
+		})
 	end
 
 	print_step(state, "2/5", "create train stop")
 	place_ghost(surface, player, force, {
 		name = "train-stop",
-		grid_x = 0,
-		grid_y = 0,
 		position = {anchor_x, anchor_y},
 		direction = station_direction,
-		tags = {station_name = station_name},
+		tags = {station_name = "MPP Mining Loading"},
 	})
 
 	print_step(state, "3/5", "create loading chests and inserters")
-	local side = (station_direction == NORTH or station_direction == EAST) and 1 or -1
-	for i = 1, spec.count do
-		local y = anchor_y + i - math.ceil(spec.count / 2)
-		place_ghost(surface, player, force, {name = chest_name, grid_x = 0, grid_y = 0, position = {anchor_x + side * 2, y}, direction = NORTH})
-		place_ghost(surface, player, force, {name = inserter_name, grid_x = 0, grid_y = 0, position = {anchor_x + side, y}, direction = side > 0 and EAST or WEST})
+	for i, _ in ipairs(outputs) do
+		local y = anchor_y + i - math.ceil(#outputs / 2)
+		place_ghost(surface, player, force, {
+			name = chest_name,
+			position = {anchor_x + side * 2, y},
+			direction = NORTH,
+		})
+		place_ghost(surface, player, force, {
+			name = inserter_name,
+			position = {anchor_x + side, y},
+			direction = side > 0 and EAST or WEST,
+		})
 	end
 
 	print_step(state, "4/5", "route belts from patch outputs to station")
-	for i = 1, spec.count do
-		local belt = spec[i]
-		local src_x, src_y = math.floor(belt.world_x), math.floor(belt.world_y)
+	for i, src in ipairs(outputs) do
 		local dst_x = anchor_x + side * 3
-		local dst_y = anchor_y + i - math.ceil(spec.count / 2)
+		local dst_y = anchor_y + i - math.ceil(#outputs / 2)
 
-		local x1, x2 = math.min(src_x, dst_x), math.max(src_x, dst_x)
+		local x1, x2 = math.min(src.x, dst_x), math.max(src.x, dst_x)
 		for x = x1, x2 do
-			place_ghost(surface, player, force, {name = belt_name, grid_x = 0, grid_y = 0, position = {x, src_y}, direction = src_x <= dst_x and EAST or WEST})
+			place_ghost(surface, player, force, {
+				name = belt_name,
+				position = {x, src.y},
+				direction = src.x <= dst_x and EAST or WEST,
+			})
 		end
 
-		local y1, y2 = math.min(src_y, dst_y), math.max(src_y, dst_y)
+		local y1, y2 = math.min(src.y, dst_y), math.max(src.y, dst_y)
 		for y = y1, y2 do
-			place_ghost(surface, player, force, {name = belt_name, grid_x = 0, grid_y = 0, position = {dst_x, y}, direction = src_y <= dst_y and SOUTH or NORTH})
+			place_ghost(surface, player, force, {
+				name = belt_name,
+				position = {dst_x, y},
+				direction = src.y <= dst_y and SOUTH or NORTH,
+			})
 		end
 	end
 
 	print_step(state, "5/5", "add power poles")
 	for i = -6, 6, 3 do
-		place_ghost(surface, player, force, {name = "medium-electric-pole", grid_x = 0, grid_y = 0, position = {anchor_x + side * 5, anchor_y + i}, direction = NORTH})
+		place_ghost(surface, player, force, {
+			name = pole_name,
+			position = {anchor_x + side * 5, anchor_y + i},
+			direction = NORTH,
+		})
 	end
 
-	print_step(state, "done", "train station blueprint generated")
+	print_step(state, "done", "belt-to-train-station ghosts generated")
 end
 
 return train_station_planner
