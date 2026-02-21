@@ -3,6 +3,10 @@ local EAST, NORTH, SOUTH, WEST = mpp_util.directions()
 
 local train_station_planner = {}
 
+local function align_odd(n)
+	return n % 2 == 0 and (n + 1) or n
+end
+
 local function print_step(state, step, message)
 	if state.player and state.player.valid then
 		state.player.print({"", "[MPP][TrainStation] ", step, ": ", message})
@@ -77,33 +81,33 @@ function train_station_planner.generate_from_layout_state(state)
 	local side = 1
 
 	if direction == "east" then
-		anchor_x = max_x + 12
-		anchor_y = avg_y
+		anchor_x = align_odd(max_x + 12)
+		anchor_y = align_odd(avg_y)
 		station_direction = SOUTH
 		rail_vertical = true
 		side = -1
 	elseif direction == "north" then
-		anchor_x = avg_x
-		anchor_y = min_y - 12
+		anchor_x = align_odd(avg_x)
+		anchor_y = align_odd(min_y - 12)
 		station_direction = EAST
 		rail_vertical = false
 		side = 1
 	elseif direction == "south" then
-		anchor_x = avg_x
-		anchor_y = max_y + 12
+		anchor_x = align_odd(avg_x)
+		anchor_y = align_odd(max_y + 12)
 		station_direction = WEST
 		rail_vertical = false
 		side = -1
 	else
-		anchor_x = min_x - 12
-		anchor_y = avg_y
+		anchor_x = align_odd(min_x - 12)
+		anchor_y = align_odd(avg_y)
 		station_direction = NORTH
 		rail_vertical = true
 		side = 1
 	end
 
 	print_step(state, "1/5", "create rail line")
-	for i = -16, 16 do
+	for i = -16, 16, 2 do
 		local rail_x = rail_vertical and anchor_x or (anchor_x + i)
 		local rail_y = rail_vertical and (anchor_y + i) or anchor_y
 		place_ghost(surface, player, force, {
@@ -115,15 +119,13 @@ function train_station_planner.generate_from_layout_state(state)
 
 	print_step(state, "2/5", "create train stop")
 	local trainstop_x = rail_vertical and (anchor_x+side*2) or (anchor_x+side*8)
-	local trainstop_y = rail_vertical and (anchor_y+side*8)  or (anchor_y+side*2)
+	local trainstop_y = rail_vertical and (anchor_y-side*8)  or (anchor_y+side*2)
 	place_ghost(surface, player, force, {
 		name = "train-stop",
 		position = {trainstop_x, trainstop_y},
 		direction = station_direction,
 		tags = {station_name = "MPP Mining Loading"},
 	})
-
--- 改进后的代码 (L124-155)
 	print_step(state, "3/5", "create loading chests and inserters")
 	for i, _ in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
@@ -171,8 +173,8 @@ function train_station_planner.generate_from_layout_state(state)
 	print_step(state, "4/5", "route belts from patch outputs to station")
 	for i, src in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
-		local dst_x = rail_vertical and (anchor_x + side * 3) or (anchor_x + lane)
-		local dst_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 3)
+		local dst_x = rail_vertical and (anchor_x + side * 4) or (anchor_x + lane)
+		local dst_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 4)
 
 		local x1, x2 = math.min(src.x, dst_x), math.max(src.x, dst_x)
 		for x = x1, x2 do
