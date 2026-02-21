@@ -27,6 +27,7 @@ local gui = {}
 ---| "mpp_fake_blueprint_button"
 ---| "mpp_delete_blueprint_button"
 ---| "mpp_drop_down"
+---| "mpp_train_station_number"
 ---| "mpp_undo"
 
 ---@alias MppSettingSections
@@ -146,6 +147,12 @@ end
 
 local function style_helper_quality(check, filtered)
 	return filtered and "mpp_button_quality_hidden" or check and "mpp_button_quality_active" or "mpp_button_quality"
+end
+
+local function sanitize_positive_int(value, fallback)
+	local num = math.floor(tonumber(value) or fallback)
+	if num < 1 then return fallback end
+	return num
 end
 
 ---@class SettingSelectorOptions
@@ -1233,6 +1240,57 @@ local function update_misc_selection(player)
 
 	local table_root = player_data.gui.tables["misc"]
 	create_setting_selector(player_data, table_root, "mpp_toggle", "misc", values)
+
+	local old_config = misc_section["mpp_train_station_config"]
+	if old_config then old_config.destroy() end
+
+	if choices.train_station_choice then
+		local config_root = misc_section.add{type="flow", direction="vertical", name="mpp_train_station_config"}
+		config_root.style.top_margin = 6
+
+		config_root.add{type="label", caption={"mpp.train_station_type_label"}}
+		local station_type_items = {
+			{"mpp.train_station_type_loading"},
+			{"mpp.train_station_type_unloading"},
+		}
+		local station_type_choice = choices.train_station_type_choice or "loading"
+		local station_type_index = station_type_choice == "unloading" and 2 or 1
+		config_root.add{
+			type="drop-down",
+			items=station_type_items,
+			selected_index=station_type_index,
+			tags={mpp_drop_down="train_station_type", mpp_value_map="train_station_type", default=1},
+		}
+
+		local numeric_table = config_root.add{type="table", column_count=2}
+		numeric_table.add{type="label", caption={"mpp.train_station_offset_label"}}
+		numeric_table.add{
+			type="textfield",
+			text=tostring(sanitize_positive_int(choices.train_station_offset_choice, 12)),
+			numeric=true,
+			allow_decimal=false,
+			allow_negative=false,
+			tags={mpp_train_station_number="train_station_offset_choice", default=12},
+		}
+		numeric_table.add{type="label", caption={"mpp.train_station_train_length_label"}}
+		numeric_table.add{
+			type="textfield",
+			text=tostring(sanitize_positive_int(choices.train_station_train_length_choice, 1)),
+			numeric=true,
+			allow_decimal=false,
+			allow_negative=false,
+			tags={mpp_train_station_number="train_station_train_length_choice", default=1},
+		}
+		numeric_table.add{type="label", caption={"mpp.train_station_wagon_length_label"}}
+		numeric_table.add{
+			type="textfield",
+			text=tostring(sanitize_positive_int(choices.train_station_wagon_length_choice, 2)),
+			numeric=true,
+			allow_decimal=false,
+			allow_negative=false,
+			tags={mpp_train_station_number="train_station_wagon_length_choice", default=2},
+		}
+	end
 end
 
 ---@param player_data PlayerData
@@ -1676,6 +1734,8 @@ local function on_gui_selection_state_changed(event)
 		value = layouts[element.selected_index].name
 	elseif value_map == "quality" then
 		value = mpp_util.quality_list()[element.selected_index].value
+	elseif value_map == "train_station_type" then
+		value = element.selected_index == 2 and "unloading" or "loading"
 	else
 		return
 	end
@@ -1687,6 +1747,19 @@ local function on_gui_selection_state_changed(event)
 	update_selections(player)
 end
 script.on_event(defines.events.on_gui_selection_state_changed, on_gui_selection_state_changed)
+
+---@param event EventData.on_gui_text_changed
+local function on_gui_text_changed(event)
+	local player_data = storage.players[event.player_index]
+	local element = event.element
+	local tags = element.tags
+	local choice = tags.mpp_train_station_number
+	if not choice then return end
+
+	local fallback = tags.default or 1
+	player_data.choices[choice] = sanitize_positive_int(element.text, fallback)
+end
+script.on_event(defines.events.on_gui_text_changed, on_gui_text_changed)
 
 ---@param event EventData.on_gui_elem_changed
 local function on_gui_elem_changed(event)

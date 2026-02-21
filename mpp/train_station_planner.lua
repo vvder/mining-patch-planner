@@ -7,6 +7,12 @@ local function align_odd(n)
 	return n % 2 == 0 and (n + 1) or n
 end
 
+local function clamp_positive_int(value, fallback)
+	local num = math.floor(tonumber(value) or fallback)
+	if num < 1 then return fallback end
+	return num
+end
+
 local function print_step(state, step, message)
 	if state.player and state.player.valid then
 		state.player.print({"", "[MPP][TrainStation] ", step, ": ", message})
@@ -76,38 +82,46 @@ function train_station_planner.generate_from_layout_state(state)
 	avg_y = math.floor(avg_y / #outputs)
 
 	local direction = state.direction_choice or "west"
+	local station_offset = clamp_positive_int(state.train_station_offset_choice, 12)
+	local train_length = clamp_positive_int(state.train_station_train_length_choice, 1)
+	local wagon_length = clamp_positive_int(state.train_station_wagon_length_choice, 2)
+	local station_type = state.train_station_type_choice or "loading"
 	local anchor_x, anchor_y, station_direction
 	local rail_vertical = true
 	local side = 1
 
 	if direction == "east" then
-		anchor_x = align_odd(max_x + 12)
+		anchor_x = align_odd(max_x + station_offset)
 		anchor_y = align_odd(avg_y)
 		station_direction = SOUTH
 		rail_vertical = true
 		side = -1
 	elseif direction == "north" then
 		anchor_x = align_odd(avg_x)
-		anchor_y = align_odd(min_y - 12)
+		anchor_y = align_odd(min_y - station_offset)
 		station_direction = EAST
 		rail_vertical = false
 		side = 1
 	elseif direction == "south" then
 		anchor_x = align_odd(avg_x)
-		anchor_y = align_odd(max_y + 12)
+		anchor_y = align_odd(max_y + station_offset)
 		station_direction = WEST
 		rail_vertical = false
 		side = -1
 	else
-		anchor_x = align_odd(min_x - 12)
+		anchor_x = align_odd(min_x - station_offset)
 		anchor_y = align_odd(avg_y)
 		station_direction = NORTH
 		rail_vertical = true
 		side = 1
 	end
 
+	local rolling_stock_count = math.max(1, train_length + wagon_length)
+	local rail_half_span = math.max(16, rolling_stock_count * 3 + 4)
+	local stop_longitudinal_offset = side * (wagon_length * 3 + 2)
+
 	print_step(state, "1/5", "create rail line")
-	for i = -16, 16, 2 do
+	for i = -rail_half_span, rail_half_span, 2 do
 		local rail_x = rail_vertical and anchor_x or (anchor_x + i)
 		local rail_y = rail_vertical and (anchor_y + i) or anchor_y
 		place_ghost(surface, player, force, {
@@ -118,8 +132,8 @@ function train_station_planner.generate_from_layout_state(state)
 	end
 
 	print_step(state, "2/5", "create train stop")
-	local trainstop_x = rail_vertical and (anchor_x+side*2) or (anchor_x+side*8)
-	local trainstop_y = rail_vertical and (anchor_y-side*8)  or (anchor_y+side*2)
+	local trainstop_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + stop_longitudinal_offset)
+	local trainstop_y = rail_vertical and (anchor_y - stop_longitudinal_offset)  or (anchor_y + side * 2)
 	place_ghost(surface, player, force, {
 		name = "train-stop",
 		position = {trainstop_x, trainstop_y},
@@ -130,51 +144,51 @@ function train_station_planner.generate_from_layout_state(state)
 	for i, _ in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
 		
-		-- 第一个插入器：从传送带取货到箱子
-		local inserter1_x = rail_vertical and (anchor_x + side * 3) or (anchor_x + lane)
-		local inserter1_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 3)
-		
-		-- 箱子
-		local chest_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + lane)
-		local chest_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 2)
-		
-		-- 第二个插入器：从箱子取货到火车
-		local inserter2_x = rail_vertical and (anchor_x + side) or (anchor_x + lane)
-		local inserter2_y = rail_vertical and (anchor_y + lane) or (anchor_y + side)
+		-- 从铁轨边缘向外布局：插入器-箱子-插入器-传送带
+		local inserter_rail_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + lane)
+		local inserter_rail_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 2)
+
+		local chest_x = rail_vertical and (anchor_x + side * 3) or (anchor_x + lane)
+		local chest_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 3)
+
+		local inserter_belt_x = rail_vertical and (anchor_x + side * 4) or (anchor_x + lane)
+		local inserter_belt_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 4)
 		local inserter_direction = NORTH
 		if rail_vertical then
 			inserter_direction = side > 0 and EAST or WEST
 		else
 			inserter_direction = side > 0 and SOUTH or NORTH
 		end
+		local reverse_inserter_direction = (inserter_direction + 4) % 8
+		local near_rail_direction = station_type == "unloading" and reverse_inserter_direction or inserter_direction
+		local near_belt_direction = station_type == "unloading" and inserter_direction or reverse_inserter_direction
 		
-		-- 放置第一个插入器（传送带→箱子）
+		-- 靠铁轨的插入器
 		place_ghost(surface, player, force, {
 			name = inserter_name,
-			position = {inserter1_x, inserter1_y},
-			direction = inserter_direction,
+			position = {inserter_rail_x, inserter_rail_y},
+			direction = near_rail_direction,
 		})
 		
-		-- 放置箱子
 		place_ghost(surface, player, force, {
 			name = chest_name,
 			position = {chest_x, chest_y},
 			direction = NORTH,
 		})
 		
-		-- 放置第二个插入器（箱子→铁轨）
+		-- 靠传送带的插入器
 		place_ghost(surface, player, force, {
 			name = inserter_name,
-			position = {inserter2_x, inserter2_y},
-			direction = inserter_direction,
+			position = {inserter_belt_x, inserter_belt_y},
+			direction = near_belt_direction,
 		})
 	end
 
 	print_step(state, "4/5", "route belts from patch outputs to station")
 	for i, src in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
-		local dst_x = rail_vertical and (anchor_x + side * 4) or (anchor_x + lane)
-		local dst_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 4)
+		local dst_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + lane)
+		local dst_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 5)
 
 		local x1, x2 = math.min(src.x, dst_x), math.max(src.x, dst_x)
 		for x = x1, x2 do
