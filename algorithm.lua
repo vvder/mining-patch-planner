@@ -29,6 +29,7 @@ require_layout("blueprints")
 ---@alias TaskType
 ---| "layout"
 ---| "belt_planner"
+---| "train_station_planner"
 
 ---@class TaskState
 ---@field type TaskType

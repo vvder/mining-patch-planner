@@ -24,6 +24,7 @@ local conf = {}
 ---@field selection_render LuaRenderObject[] Selection overlay
 ---@field belt_planner_blueprint LuaItemStack?
 ---@field belt_planner_stack BeltPlannerSpecification[]
+---@field train_station_planner_stack TrainStationPlannerSpecification[]
 
 ---@class PlayerChoices
 ---@field layout_choice string
@@ -104,6 +105,7 @@ conf.default_config = {
 	selection_render = {},
 	selection_cache = {},
 	belt_planner_stack = {},
+	train_station_planner_stack = {},
 
 	choices = {
 		layout_choice = "simple",

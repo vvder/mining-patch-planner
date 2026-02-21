@@ -29,11 +29,12 @@ function task_runner_handler(event)
 		local tasks = storage.immediate_tasks
 		storage.immediate_tasks = {}
 		for _, task in ipairs(tasks) do
+			local runner = task.type == "train_station_planner" and task_runner.train_station_plan_task or task_runner.belt_plan_task
 			if not __DebugAdapter then
-				task_runner.belt_plan_task(task --[[@as BeltinatorState]])
+				runner(task)
 			else
 				local success
-				success, tick_result = pcall(task_runner.belt_plan_task, task)
+				success, tick_result = pcall(runner, task)
 				if success == false then
 					game.print(tick_result)
 					tick_result = false
@@ -285,7 +286,7 @@ end
 script.on_event(defines.events.on_built_entity, function(event)
 	local ent = event.entity
 	local tags = ent.tags
-	if tags == nil or tags.mpp_belt_planner == nil then return end
+	if tags == nil or (tags.mpp_belt_planner == nil and tags.mpp_train_station_planner == nil) then return end
 	
 	local position = ent.position
 	local gx, gy = position.x, position.y
