@@ -1,5 +1,6 @@
 local mpp_util = require("mpp.mpp_util")
 local belt_planner = require("mpp.belt_planner")
+local train_station_planner = require("mpp.train_station_planner")
 
 local task_runner = {}
 
@@ -86,6 +87,11 @@ end
 ---@param state BeltinatorState
 function task_runner.belt_plan_task(state)
 	belt_planner.layout(state)
+end
+
+---@param state TrainStationPlannerState
+function task_runner.train_station_plan_task(state)
+	train_station_planner.layout(state)
 end
 
 return task_runner

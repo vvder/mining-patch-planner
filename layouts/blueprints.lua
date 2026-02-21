@@ -1413,6 +1413,12 @@ function layout:finish(state)
 		belt_planner.clear_belt_planner_stack(storage.players[state.player.index])
 		common.give_belt_blueprint(state)
 	end
+
+	if state.train_station_choice then
+		local player_data = storage.players[state.player.index]
+		train_station_planner.clear_stack(player_data)
+		common.give_train_station_blueprint(state)
+	end
 	
 	return false
 end

@@ -29,11 +29,12 @@ function task_runner_handler(event)
 		local tasks = storage.immediate_tasks
 		storage.immediate_tasks = {}
 		for _, task in ipairs(tasks) do
+			local runner = task.type == "train_station_planner" and task_runner.train_station_plan_task or task_runner.belt_plan_task
 			if not __DebugAdapter then
-				task_runner.belt_plan_task(task --[[@as BeltinatorState]])
+				runner(task)
 			else
 				local success
-				success, tick_result = pcall(task_runner.belt_plan_task, task)
+				success, tick_result = pcall(runner, task)
 				if success == false then
 					game.print(tick_result)
 					tick_result = false
@@ -285,7 +286,7 @@ end
 script.on_event(defines.events.on_built_entity, function(event)
 	local ent = event.entity
 	local tags = ent.tags
-	if tags == nil or tags.mpp_belt_planner == nil then return end
+	if tags == nil or (tags.mpp_belt_planner == nil and tags.mpp_train_station_planner == nil) then return end
 	
 	local position = ent.position
 	local gx, gy = position.x, position.y
@@ -294,7 +295,41 @@ script.on_event(defines.events.on_built_entity, function(event)
 	local surface = ent.surface
 	
 	ent.destroy()
-	
+
+	if tags.mpp_train_station_planner == "main" then
+		local train_stack = storage.players[event.player_index].train_station_planner_stack or {}
+		if #train_stack == 0 then
+			player.print({"mpp.msg_train_station_err_no_previous_state"})
+			return
+		end
+		local spec = train_stack[#train_stack]
+		if surface ~= spec.surface then return end
+
+		local coords = spec.coords
+		local mid_x, mid_y = coords.gx + coords.w / 2, coords.gy + coords.h / 2
+		if math.abs(mid_x - gx) > 150 or math.abs(mid_y - gy) > 150 then
+			player.print({"mpp.msg_train_station_err_too_far"})
+			return
+		end
+
+		---@type TrainStationPlannerState
+		local train_state = {
+			type = "train_station_planner",
+			surface = player.surface,
+			player = player,
+			coords = spec.coords,
+			direction_choice = spec.direction_choice,
+			spec = spec,
+			anchor_x = gx,
+			anchor_y = gy,
+			anchor_direction = world_direction,
+			options = {station_name = "MPP Mining Loading"},
+		}
+		table.insert(storage.immediate_tasks, train_state)
+		script.on_event(defines.events.on_tick, task_runner_handler)
+		return
+	end
+
 	if tags.mpp_belt_planner ~= "main" then return end
 	
 	local belt_planner_stack = storage.players[event.player_index].belt_planner_stack
