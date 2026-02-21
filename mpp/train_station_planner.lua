@@ -54,24 +54,61 @@ function train_station_planner.generate_from_layout_state(state)
 	local rail_name = "straight-rail"
 	local pole_name = state.pole_choice ~= "none" and state.pole_choice or "medium-electric-pole"
 
+	local avg_x = 0
 	local avg_y = 0
 	local min_x = outputs[1].x
+	local max_x = outputs[1].x
+	local min_y = outputs[1].y
+	local max_y = outputs[1].y
 	for _, o in ipairs(outputs) do
+		avg_x = avg_x + o.x
 		avg_y = avg_y + o.y
 		if o.x < min_x then min_x = o.x end
+		if o.x > max_x then max_x = o.x end
+		if o.y < min_y then min_y = o.y end
+		if o.y > max_y then max_y = o.y end
 	end
+	avg_x = math.floor(avg_x / #outputs)
 	avg_y = math.floor(avg_y / #outputs)
 
-	local anchor_x = min_x - 18
-	local anchor_y = avg_y
-	local station_direction = NORTH
+	local direction = state.direction_choice or "west"
+	local anchor_x, anchor_y, station_direction
+	local rail_vertical = true
 	local side = 1
+
+	if direction == "east" then
+		anchor_x = max_x + 18
+		anchor_y = avg_y
+		station_direction = SOUTH
+		rail_vertical = true
+		side = -1
+	elseif direction == "north" then
+		anchor_x = avg_x
+		anchor_y = min_y - 18
+		station_direction = EAST
+		rail_vertical = false
+		side = 1
+	elseif direction == "south" then
+		anchor_x = avg_x
+		anchor_y = max_y + 18
+		station_direction = WEST
+		rail_vertical = false
+		side = -1
+	else
+		anchor_x = min_x - 18
+		anchor_y = avg_y
+		station_direction = NORTH
+		rail_vertical = true
+		side = 1
+	end
 
 	print_step(state, "1/5", "create rail line")
 	for i = -8, 8 do
+		local rail_x = rail_vertical and anchor_x or (anchor_x + i)
+		local rail_y = rail_vertical and (anchor_y + i) or anchor_y
 		place_ghost(surface, player, force, {
 			name = rail_name,
-			position = {anchor_x, anchor_y + i},
+			position = {rail_x, rail_y},
 			direction = station_direction,
 		})
 	end
@@ -86,23 +123,34 @@ function train_station_planner.generate_from_layout_state(state)
 
 	print_step(state, "3/5", "create loading chests and inserters")
 	for i, _ in ipairs(outputs) do
-		local y = anchor_y + i - math.ceil(#outputs / 2)
+		local lane = i - math.ceil(#outputs / 2)
+		local chest_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + lane)
+		local chest_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 2)
+		local inserter_x = rail_vertical and (anchor_x + side) or (anchor_x + lane)
+		local inserter_y = rail_vertical and (anchor_y + lane) or (anchor_y + side)
+		local inserter_direction = NORTH
+		if rail_vertical then
+			inserter_direction = side > 0 and EAST or WEST
+		else
+			inserter_direction = side > 0 and SOUTH or NORTH
+		end
 		place_ghost(surface, player, force, {
 			name = chest_name,
-			position = {anchor_x + side * 2, y},
+			position = {chest_x, chest_y},
 			direction = NORTH,
 		})
 		place_ghost(surface, player, force, {
 			name = inserter_name,
-			position = {anchor_x + side, y},
-			direction = side > 0 and EAST or WEST,
+			position = {inserter_x, inserter_y},
+			direction = inserter_direction,
 		})
 	end
 
 	print_step(state, "4/5", "route belts from patch outputs to station")
 	for i, src in ipairs(outputs) do
-		local dst_x = anchor_x + side * 3
-		local dst_y = anchor_y + i - math.ceil(#outputs / 2)
+		local lane = i - math.ceil(#outputs / 2)
+		local dst_x = rail_vertical and (anchor_x + side * 3) or (anchor_x + lane)
+		local dst_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 3)
 
 		local x1, x2 = math.min(src.x, dst_x), math.max(src.x, dst_x)
 		for x = x1, x2 do
@@ -125,9 +173,11 @@ function train_station_planner.generate_from_layout_state(state)
 
 	print_step(state, "5/5", "add power poles")
 	for i = -6, 6, 3 do
+		local pole_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + i)
+		local pole_y = rail_vertical and (anchor_y + i) or (anchor_y + side * 5)
 		place_ghost(surface, player, force, {
 			name = pole_name,
-			position = {anchor_x + side * 5, anchor_y + i},
+			position = {pole_x, pole_y},
 			direction = NORTH,
 		})
 	end
