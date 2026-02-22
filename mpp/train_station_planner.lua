@@ -34,6 +34,52 @@ local function place_ghost(surface, player, force, ghost)
 end
 
 ---@param belts BeltSpecification[]
+
+local function step_direction(x1, y1, x2, y2)
+	if x2 > x1 then return EAST end
+	if x2 < x1 then return WEST end
+	if y2 > y1 then return SOUTH end
+	return NORTH
+end
+
+---@param surface LuaSurface
+---@param player LuaPlayer
+---@param force LuaForce
+---@param belt_name string
+---@param points table[]
+---@param final_direction defines.direction
+local function place_belt_path(surface, player, force, belt_name, points, final_direction)
+	if #points == 0 then return end
+	for i = 1, #points - 1 do
+		local point = points[i]
+		local next_point = points[i+1]
+		local direction = step_direction(point.x, point.y, next_point.x, next_point.y)
+		local dx = next_point.x == point.x and 0 or (next_point.x > point.x and 1 or -1)
+		local dy = next_point.y == point.y and 0 or (next_point.y > point.y and 1 or -1)
+		local x, y = point.x, point.y
+		place_ghost(surface, player, force, {
+			name = belt_name,
+			position = {x, y},
+			direction = direction,
+		})
+		while x ~= next_point.x or y ~= next_point.y do
+			x = x + dx
+			y = y + dy
+			place_ghost(surface, player, force, {
+				name = belt_name,
+				position = {x, y},
+				direction = direction,
+			})
+		end
+	end
+	local last = points[#points]
+	place_ghost(surface, player, force, {
+		name = belt_name,
+		position = {last.x, last.y},
+		direction = final_direction,
+	})
+end
+
 local function to_world_belt_outputs(state, belts)
 	local outputs = {}
 	local converter = mpp_util.reverter_delegate(state.coords, state.direction_choice)
@@ -140,6 +186,7 @@ function train_station_planner.generate_from_layout_state(state)
 		tags = {station_name = "MPP Mining Loading"},
 	})
 	print_step(state, "3/5", "create loading chests and inserters")
+	local lanes = {}
 	for i, _ in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
 		
@@ -152,15 +199,17 @@ function train_station_planner.generate_from_layout_state(state)
 
 		local inserter_belt_x = rail_vertical and (anchor_x + side * 4) or (anchor_x + lane)
 		local inserter_belt_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 4)
+		local belt_end_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + lane)
+		local belt_end_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 5)
 		local inserter_direction = NORTH
 		if rail_vertical then
 			inserter_direction = side > 0 and EAST or WEST
 		else
 			inserter_direction = side > 0 and SOUTH or NORTH
 		end
-		local reverse_inserter_direction = (inserter_direction + 4) % 8
+		-- local reverse_inserter_direction = (inserter_direction + 4) % 8
 		local near_rail_direction = inserter_direction
-		local near_belt_direction = reverse_inserter_direction
+		local near_belt_direction = inserter_direction
 		
 		-- 靠铁轨的插入器
 		place_ghost(surface, player, force, {
@@ -181,31 +230,36 @@ function train_station_planner.generate_from_layout_state(state)
 			position = {inserter_belt_x, inserter_belt_y},
 			direction = near_belt_direction,
 		})
+
+		lanes[i] = {
+			belt_end_x = belt_end_x,
+			belt_end_y = belt_end_y,
+			sink_x = inserter_belt_x,
+			sink_y = inserter_belt_y,
+		}
 	end
 
 	print_step(state, "4/5", "route belts from patch outputs to station")
+	local lane_center = math.ceil(#outputs / 2)
 	for i, src in ipairs(outputs) do
-		local lane = i - math.ceil(#outputs / 2)
-		local dst_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + lane)
-		local dst_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 5)
+		local lane = lanes[i]
+		local lane_offset = (i - lane_center) * 2
+		local points = {{x = src.x, y = src.y}}
 
-		local x1, x2 = math.min(src.x, dst_x), math.max(src.x, dst_x)
-		for x = x1, x2 do
-			place_ghost(surface, player, force, {
-				name = belt_name,
-				position = {x, src.y},
-				direction = src.x <= dst_x and EAST or WEST,
-			})
+		if rail_vertical then
+			local mid_x = align_odd(math.floor((src.x + lane.belt_end_x) / 2)) + lane_offset
+			if mid_x ~= src.x then points[#points+1] = {x = mid_x, y = src.y} end
+			if lane.belt_end_y ~= src.y then points[#points+1] = {x = mid_x, y = lane.belt_end_y} end
+			if lane.belt_end_x ~= mid_x then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
+		else
+			local mid_y = align_odd(math.floor((src.y + lane.belt_end_y) / 2)) + lane_offset
+			if mid_y ~= src.y then points[#points+1] = {x = src.x, y = mid_y} end
+			if lane.belt_end_x ~= src.x then points[#points+1] = {x = lane.belt_end_x, y = mid_y} end
+			if lane.belt_end_y ~= mid_y then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
 		end
 
-		local y1, y2 = math.min(src.y, dst_y), math.max(src.y, dst_y)
-		for y = y1, y2 do
-			place_ghost(surface, player, force, {
-				name = belt_name,
-				position = {dst_x, y},
-				direction = src.y <= dst_y and SOUTH or NORTH,
-			})
-		end
+		local final_direction = step_direction(lane.belt_end_x, lane.belt_end_y, lane.sink_x, lane.sink_y)
+		place_belt_path(surface, player, force, belt_name, points, final_direction)
 	end
 
 	-- print_step(state, "5/5", "add power poles")
