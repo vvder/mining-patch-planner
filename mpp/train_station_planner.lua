@@ -91,6 +91,52 @@ end
 ---@param belts BeltSpecification[]
 ---@return table[]
 ---将布局内部坐标系中的输出带起点，转换为世界坐标并按 y 排序，稳定映射到站台车道。
+
+local function step_direction(x1, y1, x2, y2)
+	if x2 > x1 then return EAST end
+	if x2 < x1 then return WEST end
+	if y2 > y1 then return SOUTH end
+	return NORTH
+end
+
+---@param surface LuaSurface
+---@param player LuaPlayer
+---@param force LuaForce
+---@param belt_name string
+---@param points table[]
+---@param final_direction defines.direction
+local function place_belt_path(surface, player, force, belt_name, points, final_direction)
+	if #points == 0 then return end
+	for i = 1, #points - 1 do
+		local point = points[i]
+		local next_point = points[i+1]
+		local direction = step_direction(point.x, point.y, next_point.x, next_point.y)
+		local dx = next_point.x == point.x and 0 or (next_point.x > point.x and 1 or -1)
+		local dy = next_point.y == point.y and 0 or (next_point.y > point.y and 1 or -1)
+		local x, y = point.x, point.y
+		place_ghost(surface, player, force, {
+			name = belt_name,
+			position = {x, y},
+			direction = direction,
+		})
+		while x ~= next_point.x or y ~= next_point.y do
+			x = x + dx
+			y = y + dy
+			place_ghost(surface, player, force, {
+				name = belt_name,
+				position = {x, y},
+				direction = direction,
+			})
+		end
+	end
+	local last = points[#points]
+	place_ghost(surface, player, force, {
+		name = belt_name,
+		position = {last.x, last.y},
+		direction = final_direction,
+	})
+end
+
 local function to_world_belt_outputs(state, belts)
 	local outputs = {}
 	local converter = mpp_util.reverter_delegate(state.coords, state.direction_choice)
@@ -221,9 +267,9 @@ function train_station_planner.generate_from_layout_state(state)
 		else
 			inserter_direction = side > 0 and SOUTH or NORTH
 		end
-		local reverse_inserter_direction = (inserter_direction + 4) % 8
+		-- local reverse_inserter_direction = (inserter_direction + 4) % 8
 		local near_rail_direction = inserter_direction
-		local near_belt_direction = reverse_inserter_direction
+		local near_belt_direction = inserter_direction
 		
 		place_ghost(surface, player, force, {
 			name = inserter_name,
