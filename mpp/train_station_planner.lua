@@ -207,9 +207,9 @@ function train_station_planner.generate_from_layout_state(state)
 		else
 			inserter_direction = side > 0 and SOUTH or NORTH
 		end
-		local reverse_inserter_direction = (inserter_direction + 4) % 8
+		-- local reverse_inserter_direction = (inserter_direction + 4) % 8
 		local near_rail_direction = inserter_direction
-		local near_belt_direction = reverse_inserter_direction
+		local near_belt_direction = inserter_direction
 		
 		-- 靠铁轨的插入器
 		place_ghost(surface, player, force, {
