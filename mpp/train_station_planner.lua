@@ -33,7 +33,64 @@ local function place_ghost(surface, player, force, ghost)
 	surface.create_entity(ghost)
 end
 
+---@param x1 number
+---@param y1 number
+---@param x2 number
+---@param y2 number
+---@return defines.direction
+---根据相邻两点计算传送带方向，用于保证每一段都指向“下一格实体”。
+local function step_direction(x1, y1, x2, y2)
+	if x2 > x1 then return EAST end
+	if x2 < x1 then return WEST end
+	if y2 > y1 then return SOUTH end
+	return NORTH
+end
+
+---@param surface LuaSurface
+---@param player LuaPlayer
+---@param force LuaForce
+---@param belt_name string
+---@param points table[]
+---@param final_direction defines.direction
+---按折线关键点逐格铺设传送带：
+---1) 段内每格统一朝向下一格；
+---2) 最后一格按 final_direction 指向终点实体（通常是靠带侧机械臂）。
+local function place_belt_path(surface, player, force, belt_name, points, final_direction)
+	if #points == 0 then return end
+	for i = 1, #points - 1 do
+		local point = points[i]
+		local next_point = points[i+1]
+		local direction = step_direction(point.x, point.y, next_point.x, next_point.y)
+		local dx = next_point.x == point.x and 0 or (next_point.x > point.x and 1 or -1)
+		local dy = next_point.y == point.y and 0 or (next_point.y > point.y and 1 or -1)
+		local x, y = point.x, point.y
+		place_ghost(surface, player, force, {
+			name = belt_name,
+			position = {x, y},
+			direction = direction,
+		})
+		while x ~= next_point.x or y ~= next_point.y do
+			x = x + dx
+			y = y + dy
+			place_ghost(surface, player, force, {
+				name = belt_name,
+				position = {x, y},
+				direction = direction,
+			})
+		end
+	end
+	local last = points[#points]
+	place_ghost(surface, player, force, {
+		name = belt_name,
+		position = {last.x, last.y},
+		direction = final_direction,
+	})
+end
+
+---@param state MinimumPreservedState
 ---@param belts BeltSpecification[]
+---@return table[]
+---将布局内部坐标系中的输出带起点，转换为世界坐标并按 y 排序，稳定映射到站台车道。
 
 local function step_direction(x1, y1, x2, y2)
 	if x2 > x1 then return EAST end
@@ -95,6 +152,7 @@ end
 
 ---@param state MinimumPreservedState
 function train_station_planner.generate_from_layout_state(state)
+	-- 阶段 0：收集矿区输出口。
 	local outputs = to_world_belt_outputs(state, state.belts)
 	if #outputs == 0 then
 		print_step(state, "skip", "no output belts")
@@ -135,6 +193,7 @@ function train_station_planner.generate_from_layout_state(state)
 	local rail_vertical = true
 	local side = 1
 
+	-- 阶段 1：依据玩家方向选择车站锚点与铁轨朝向。
 	if direction == "east" then
 		anchor_x = align_odd(max_x + station_offset)
 		anchor_y = align_odd(avg_y)
@@ -185,12 +244,13 @@ function train_station_planner.generate_from_layout_state(state)
 		direction = station_direction,
 		tags = {station_name = "MPP Mining Loading"},
 	})
+
 	print_step(state, "3/5", "create loading chests and inserters")
 	local lanes = {}
 	for i, _ in ipairs(outputs) do
 		local lane = i - math.ceil(#outputs / 2)
 		
-		-- 从铁轨边缘向外布局：插入器-箱子-插入器-传送带
+		-- 从铁轨边缘向外布局：插入器-箱子-插入器-传送带。
 		local inserter_rail_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + lane)
 		local inserter_rail_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 2)
 
@@ -211,7 +271,6 @@ function train_station_planner.generate_from_layout_state(state)
 		local near_rail_direction = inserter_direction
 		local near_belt_direction = inserter_direction
 		
-		-- 靠铁轨的插入器
 		place_ghost(surface, player, force, {
 			name = inserter_name,
 			position = {inserter_rail_x, inserter_rail_y},
@@ -224,13 +283,13 @@ function train_station_planner.generate_from_layout_state(state)
 			direction = NORTH,
 		})
 		
-		-- 靠传送带的插入器
 		place_ghost(surface, player, force, {
 			name = inserter_name,
 			position = {inserter_belt_x, inserter_belt_y},
 			direction = near_belt_direction,
 		})
 
+		-- 每条矿区输出带对应一个独立站台车道，不在中途做 merge。
 		lanes[i] = {
 			belt_end_x = belt_end_x,
 			belt_end_y = belt_end_y,
@@ -246,6 +305,7 @@ function train_station_planner.generate_from_layout_state(state)
 		local lane_offset = (i - lane_center) * 2
 		local points = {{x = src.x, y = src.y}}
 
+		-- 路由策略：先向中间靠拢（mid 点），再进入各自目标车道，防止错误汇流。
 		if rail_vertical then
 			local mid_x = align_odd(math.floor((src.x + lane.belt_end_x) / 2)) + lane_offset
 			if mid_x ~= src.x then points[#points+1] = {x = mid_x, y = src.y} end
@@ -258,6 +318,7 @@ function train_station_planner.generate_from_layout_state(state)
 			if lane.belt_end_y ~= mid_y then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
 		end
 
+		-- 最后一格必须朝向靠带侧机械臂，保证传送方向上有实体。
 		local final_direction = step_direction(lane.belt_end_x, lane.belt_end_y, lane.sink_x, lane.sink_y)
 		place_belt_path(surface, player, force, belt_name, points, final_direction)
 	end
