@@ -310,9 +310,6 @@ function layout:_apply_belt_merge_strategy(state, source, target, direction)
 	local source_total = source_t1 + source_t2
 	local target_t1, target_t2 = target.merged_throughput1, target.merged_throughput2
 	local target_total = target_t1 + target_t2
-	-- Keep merge throughput orientation-aware for mirrored/localized routing variants.
-	local source_merge_flow = source.x_start <= target.x_start and WEST or EAST
-	local source_merge1, source_merge2 = self:_calculate_belt_throughput(state, source, source_merge_flow)
 	
 	-- if source.merge_direction or target.merge_strategy == "target" then
 	if (
@@ -324,14 +321,11 @@ function layout:_apply_belt_merge_strategy(state, source, target, direction)
 		or source_total > target_total
 	) then
 		return
-	elseif source_total <= target_total and (source_merge1 + target_t2) <= 1 and (source_merge2 + target_t1) <= 1 then
+	elseif source_total <= target_total and (source_t1 + target_t2) <= 1 and (source_t2 + target_t1) <= 1 then
 		source.merge_target = target
 		source.merge_direction = direction
 		source.is_output = false
 		source.merge_strategy = "back-merge"
-		source.throughput1, source.throughput2 = source_merge1, source_merge2
-		source.merged_throughput1, source.merged_throughput2 = source_merge1, source_merge2
-		source_t1, source_t2 = source.throughput1, source.throughput2
 		target.merge_strategy = "target"
 		target.merge_slave = true
 		target.merged_throughput2 = target_t2 + source_t1
