@@ -300,6 +300,7 @@ function train_station_planner.generate_from_layout_state(state)
 
 	print_step(state, "4/5", "route belts from patch outputs to station")
 	local lane_center = math.ceil(#outputs / 2)
+	local splitter_alignment = state.train_station_splitter_alignment_choice == true
 	for i, src in ipairs(outputs) do
 		local lane = lanes[i]
 		local lane_offset = (i - lane_center) * 2
@@ -307,12 +308,14 @@ function train_station_planner.generate_from_layout_state(state)
 
 		-- 路由策略：先向中间靠拢（mid 点），再进入各自目标车道，防止错误汇流。
 		if rail_vertical then
-			local mid_x = align_odd(math.floor((src.x + lane.belt_end_x) / 2)) + lane_offset
+			local mid_x = math.floor((src.x + lane.belt_end_x) / 2) + lane_offset
+			if splitter_alignment then mid_x = align_odd(mid_x) end
 			if mid_x ~= src.x then points[#points+1] = {x = mid_x, y = src.y} end
 			if lane.belt_end_y ~= src.y then points[#points+1] = {x = mid_x, y = lane.belt_end_y} end
 			if lane.belt_end_x ~= mid_x then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
 		else
-			local mid_y = align_odd(math.floor((src.y + lane.belt_end_y) / 2)) + lane_offset
+			local mid_y = math.floor((src.y + lane.belt_end_y) / 2) + lane_offset
+			if splitter_alignment then mid_y = align_odd(mid_y) end
 			if mid_y ~= src.y then points[#points+1] = {x = src.x, y = mid_y} end
 			if lane.belt_end_x ~= src.x then points[#points+1] = {x = lane.belt_end_x, y = mid_y} end
 			if lane.belt_end_y ~= mid_y then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
