@@ -60,7 +60,7 @@ local function place_belt_path(surface, player, force, belt_name, points, final_
 			position = {x, y},
 			direction = direction,
 		})
-		while x ~= next_point.x or y ~= next_point.y do
+		while (dx > 0 and x < next_point.x) or (dx < 0 and x > next_point.x) or (dy > 0 and y < next_point.y) or (dy < 0 and y > next_point.y) do
 			x = x + dx
 			y = y + dy
 			place_ghost(surface, player, force, {
