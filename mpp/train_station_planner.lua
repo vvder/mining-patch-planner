@@ -33,65 +33,6 @@ local function place_ghost(surface, player, force, ghost)
 	surface.create_entity(ghost)
 end
 
----@param x1 number
----@param y1 number
----@param x2 number
----@param y2 number
----@return defines.direction
----根据相邻两点计算传送带方向，用于保证每一段都指向“下一格实体”。
-local function step_direction(x1, y1, x2, y2)
-	if x2 > x1 then return EAST end
-	if x2 < x1 then return WEST end
-	if y2 > y1 then return SOUTH end
-	return NORTH
-end
-
----@param surface LuaSurface
----@param player LuaPlayer
----@param force LuaForce
----@param belt_name string
----@param points table[]
----@param final_direction defines.direction
----按折线关键点逐格铺设传送带：
----1) 段内每格统一朝向下一格；
----2) 最后一格按 final_direction 指向终点实体（通常是靠带侧机械臂）。
-local function place_belt_path(surface, player, force, belt_name, points, final_direction)
-	if #points == 0 then return end
-	for i = 1, #points - 1 do
-		local point = points[i]
-		local next_point = points[i+1]
-		local direction = step_direction(point.x, point.y, next_point.x, next_point.y)
-		local dx = next_point.x == point.x and 0 or (next_point.x > point.x and 1 or -1)
-		local dy = next_point.y == point.y and 0 or (next_point.y > point.y and 1 or -1)
-		local x, y = point.x, point.y
-		place_ghost(surface, player, force, {
-			name = belt_name,
-			position = {x, y},
-			direction = direction,
-		})
-		while x ~= next_point.x or y ~= next_point.y do
-			x = x + dx
-			y = y + dy
-			place_ghost(surface, player, force, {
-				name = belt_name,
-				position = {x, y},
-				direction = direction,
-			})
-		end
-	end
-	local last = points[#points]
-	place_ghost(surface, player, force, {
-		name = belt_name,
-		position = {last.x, last.y},
-		direction = final_direction,
-	})
-end
-
----@param state MinimumPreservedState
----@param belts BeltSpecification[]
----@return table[]
----将布局内部坐标系中的输出带起点，转换为世界坐标并按 y 排序，稳定映射到站台车道。
-
 local function step_direction(x1, y1, x2, y2)
 	if x2 > x1 then return EAST end
 	if x2 < x1 then return WEST end
@@ -152,7 +93,6 @@ end
 
 ---@param state MinimumPreservedState
 function train_station_planner.generate_from_layout_state(state)
-	-- 阶段 0：收集矿区输出口。
 	local outputs = to_world_belt_outputs(state, state.belts)
 	if #outputs == 0 then
 		print_step(state, "skip", "no output belts")
@@ -163,10 +103,10 @@ function train_station_planner.generate_from_layout_state(state)
 	local player = state.player
 	local force = player.force
 	local belt_name = state.belt_choice
+	local splitter_name = state.splitter_choice or "splitter"
 	local chest_name = "steel-chest"
 	local inserter_name = "fast-inserter"
 	local rail_name = "straight-rail"
-	local pole_name = state.pole_choice ~= "none" and state.pole_choice or "medium-electric-pole"
 
 	local avg_x = 0
 	local avg_y = 0
@@ -193,7 +133,6 @@ function train_station_planner.generate_from_layout_state(state)
 	local rail_vertical = true
 	local side = 1
 
-	-- 阶段 1：依据玩家方向选择车站锚点与铁轨朝向。
 	if direction == "east" then
 		anchor_x = align_odd(max_x + station_offset)
 		anchor_y = align_odd(avg_y)
@@ -228,16 +167,12 @@ function train_station_planner.generate_from_layout_state(state)
 	for i = -rail_half_span, rail_half_span, 2 do
 		local rail_x = rail_vertical and anchor_x or (anchor_x + i)
 		local rail_y = rail_vertical and (anchor_y + i) or anchor_y
-		place_ghost(surface, player, force, {
-			name = rail_name,
-			position = {rail_x, rail_y},
-			direction = station_direction,
-		})
+		place_ghost(surface, player, force, { name = rail_name, position = {rail_x, rail_y}, direction = station_direction })
 	end
 
 	print_step(state, "2/5", "create train stop")
 	local trainstop_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + stop_longitudinal_offset)
-	local trainstop_y = rail_vertical and (anchor_y - stop_longitudinal_offset)  or (anchor_y + side * 2)
+	local trainstop_y = rail_vertical and (anchor_y - stop_longitudinal_offset) or (anchor_y + side * 2)
 	place_ghost(surface, player, force, {
 		name = "train-stop",
 		position = {trainstop_x, trainstop_y},
@@ -245,97 +180,85 @@ function train_station_planner.generate_from_layout_state(state)
 		tags = {station_name = "MPP Mining Loading"},
 	})
 
+	local splitter_alignment = state.train_station_splitter_alignment_choice == true
+	if rail_vertical then
+		table.sort(outputs, function(a, b) return a.y < b.y end)
+	else
+		table.sort(outputs, function(a, b) return a.x < b.x end)
+	end
+	local lane_count = splitter_alignment and math.ceil(#outputs / 2) or #outputs
+
 	print_step(state, "3/5", "create loading chests and inserters")
 	local lanes = {}
-	for i, _ in ipairs(outputs) do
-		local lane = i - math.ceil(#outputs / 2)
-		
-		-- 从铁轨边缘向外布局：插入器-箱子-插入器-传送带。
+	for i = 1, lane_count do
+		local lane = i - math.ceil(lane_count / 2)
 		local inserter_rail_x = rail_vertical and (anchor_x + side * 2) or (anchor_x + lane)
 		local inserter_rail_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 2)
-
 		local chest_x = rail_vertical and (anchor_x + side * 3) or (anchor_x + lane)
 		local chest_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 3)
-
 		local inserter_belt_x = rail_vertical and (anchor_x + side * 4) or (anchor_x + lane)
 		local inserter_belt_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 4)
 		local belt_end_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + lane)
 		local belt_end_y = rail_vertical and (anchor_y + lane) or (anchor_y + side * 5)
-		local inserter_direction = NORTH
-		if rail_vertical then
-			inserter_direction = side > 0 and EAST or WEST
-		else
-			inserter_direction = side > 0 and SOUTH or NORTH
-		end
-		-- local reverse_inserter_direction = (inserter_direction + 4) % 8
-		local near_rail_direction = inserter_direction
-		local near_belt_direction = inserter_direction
-		
-		place_ghost(surface, player, force, {
-			name = inserter_name,
-			position = {inserter_rail_x, inserter_rail_y},
-			direction = near_rail_direction,
-		})
-		
-		place_ghost(surface, player, force, {
-			name = chest_name,
-			position = {chest_x, chest_y},
-			direction = NORTH,
-		})
-		
-		place_ghost(surface, player, force, {
-			name = inserter_name,
-			position = {inserter_belt_x, inserter_belt_y},
-			direction = near_belt_direction,
-		})
+		local inserter_direction = rail_vertical and (side > 0 and EAST or WEST) or (side > 0 and SOUTH or NORTH)
 
-		-- 每条矿区输出带对应一个独立站台车道，不在中途做 merge。
-		lanes[i] = {
-			belt_end_x = belt_end_x,
-			belt_end_y = belt_end_y,
-			sink_x = inserter_belt_x,
-			sink_y = inserter_belt_y,
-		}
+		place_ghost(surface, player, force, { name = inserter_name, position = {inserter_rail_x, inserter_rail_y}, direction = inserter_direction })
+		place_ghost(surface, player, force, { name = chest_name, position = {chest_x, chest_y}, direction = NORTH })
+		place_ghost(surface, player, force, { name = inserter_name, position = {inserter_belt_x, inserter_belt_y}, direction = inserter_direction })
+
+		lanes[i] = { belt_end_x = belt_end_x, belt_end_y = belt_end_y, sink_x = inserter_belt_x, sink_y = inserter_belt_y }
 	end
 
 	print_step(state, "4/5", "route belts from patch outputs to station")
-	local lane_center = math.ceil(#outputs / 2)
-	local splitter_alignment = state.train_station_splitter_alignment_choice == true
-	for i, src in ipairs(outputs) do
-		local lane = lanes[i]
-		local lane_offset = (i - lane_center) * 2
-		local points = {{x = src.x, y = src.y}}
-
-		-- 路由策略：先向中间靠拢（mid 点），再进入各自目标车道，防止错误汇流。
-		if rail_vertical then
-			local mid_x = math.floor((src.x + lane.belt_end_x) / 2) + lane_offset
-			if splitter_alignment then mid_x = align_odd(mid_x) end
-			if mid_x ~= src.x then points[#points+1] = {x = mid_x, y = src.y} end
-			if lane.belt_end_y ~= src.y then points[#points+1] = {x = mid_x, y = lane.belt_end_y} end
-			if lane.belt_end_x ~= mid_x then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
-		else
-			local mid_y = math.floor((src.y + lane.belt_end_y) / 2) + lane_offset
-			if splitter_alignment then mid_y = align_odd(mid_y) end
-			if mid_y ~= src.y then points[#points+1] = {x = src.x, y = mid_y} end
-			if lane.belt_end_x ~= src.x then points[#points+1] = {x = lane.belt_end_x, y = mid_y} end
-			if lane.belt_end_y ~= mid_y then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
+	if not splitter_alignment then
+		local lane_center = math.ceil(#outputs / 2)
+		for i, src in ipairs(outputs) do
+			local lane = lanes[i]
+			local lane_offset = (i - lane_center) * 2
+			local points = {{x = src.x, y = src.y}}
+			if rail_vertical then
+				local mid_x = math.floor((src.x + lane.belt_end_x) / 2) + lane_offset
+				if mid_x ~= src.x then points[#points+1] = {x = mid_x, y = src.y} end
+				if lane.belt_end_y ~= src.y then points[#points+1] = {x = mid_x, y = lane.belt_end_y} end
+				if lane.belt_end_x ~= mid_x then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
+			else
+				local mid_y = math.floor((src.y + lane.belt_end_y) / 2) + lane_offset
+				if mid_y ~= src.y then points[#points+1] = {x = src.x, y = mid_y} end
+				if lane.belt_end_x ~= src.x then points[#points+1] = {x = lane.belt_end_x, y = mid_y} end
+				if lane.belt_end_y ~= mid_y then points[#points+1] = {x = lane.belt_end_x, y = lane.belt_end_y} end
+			end
+			local final_direction = step_direction(lane.belt_end_x, lane.belt_end_y, lane.sink_x, lane.sink_y)
+			place_belt_path(surface, player, force, belt_name, points, final_direction)
 		end
-
-		-- 最后一格必须朝向靠带侧机械臂，保证传送方向上有实体。
-		local final_direction = step_direction(lane.belt_end_x, lane.belt_end_y, lane.sink_x, lane.sink_y)
-		place_belt_path(surface, player, force, belt_name, points, final_direction)
+	else
+		for lane_index = 1, lane_count do
+			local src1 = outputs[(lane_index - 1) * 2 + 1]
+			local src2 = outputs[(lane_index - 1) * 2 + 2]
+			local lane = lanes[lane_index]
+			local final_direction = step_direction(lane.belt_end_x, lane.belt_end_y, lane.sink_x, lane.sink_y)
+			if not src2 then
+				place_belt_path(surface, player, force, belt_name, {{x = src1.x, y = src1.y}, {x = lane.belt_end_x, y = lane.belt_end_y}}, final_direction)
+			else
+				if rail_vertical then
+					local split_x = align_odd(math.floor((src1.x + src2.x + lane.belt_end_x) / 3))
+					local split_y = math.min(src1.y, src2.y)
+					local splitter_dir = side > 0 and WEST or EAST
+					place_belt_path(surface, player, force, belt_name, {{x = src1.x, y = src1.y}, {x = split_x + (side > 0 and 1 or -1), y = src1.y}, {x = split_x + (side > 0 and 1 or -1), y = split_y}}, splitter_dir)
+					place_belt_path(surface, player, force, belt_name, {{x = src2.x, y = src2.y}, {x = split_x + (side > 0 and 1 or -1), y = src2.y}, {x = split_x + (side > 0 and 1 or -1), y = split_y + 1}}, splitter_dir)
+					place_ghost(surface, player, force, { name = splitter_name, position = {split_x, split_y}, direction = splitter_dir })
+					place_belt_path(surface, player, force, belt_name, {{x = split_x + (side > 0 and -1 or 1), y = split_y}, {x = lane.belt_end_x, y = lane.belt_end_y}}, final_direction)
+				else
+					local split_y = align_odd(math.floor((src1.y + src2.y + lane.belt_end_y) / 3))
+					local split_x = math.min(src1.x, src2.x)
+					local splitter_dir = side > 0 and NORTH or SOUTH
+					place_belt_path(surface, player, force, belt_name, {{x = src1.x, y = src1.y}, {x = src1.x, y = split_y + (side > 0 and 1 or -1)}, {x = split_x, y = split_y + (side > 0 and 1 or -1)}}, splitter_dir)
+					place_belt_path(surface, player, force, belt_name, {{x = src2.x, y = src2.y}, {x = src2.x, y = split_y + (side > 0 and 1 or -1)}, {x = split_x + 1, y = split_y + (side > 0 and 1 or -1)}}, splitter_dir)
+					place_ghost(surface, player, force, { name = splitter_name, position = {split_x, split_y}, direction = splitter_dir })
+					place_belt_path(surface, player, force, belt_name, {{x = split_x, y = split_y + (side > 0 and -1 or 1)}, {x = lane.belt_end_x, y = lane.belt_end_y}}, final_direction)
+				end
+			end
+		end
 	end
-
-	-- print_step(state, "5/5", "add power poles")
-	-- for i = -6, 6, 3 do
-	-- 	local pole_x = rail_vertical and (anchor_x + side * 5) or (anchor_x + i)
-	-- 	local pole_y = rail_vertical and (anchor_y + i) or (anchor_y + side * 5)
-	-- 	place_ghost(surface, player, force, {
-	-- 		name = pole_name,
-	-- 		position = {pole_x, pole_y},
-	-- 		direction = NORTH,
-	-- 	})
-	-- end
 
 	print_step(state, "done", "belt-to-train-station ghosts generated")
 end
