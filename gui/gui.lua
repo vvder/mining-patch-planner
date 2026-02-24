@@ -1046,8 +1046,18 @@ local function update_misc_selection(player)
 			value="train_station",
 			tooltip={"mpp.choice_train_station_planner"},
 			icon=("item/train-stop"),
-			icon_enabled=("item/train-stop")
+			icon_enabled=("item/train-stop"),
+			refresh=true,
 		}
+
+		if choices.train_station_choice then
+			values:push{
+				value="train_station_splitter_alignment",
+				tooltip={"mpp.choice_train_station_splitter_alignment"},
+				icon=("item/splitter"),
+				icon_enabled=("item/splitter"),
+			}
+		end
 	end
 	
 	if layout.restrictions.belt_merging_available then
